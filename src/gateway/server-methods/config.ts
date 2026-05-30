@@ -32,6 +32,7 @@ import {
   writeRestartSentinel,
 } from "../../infra/restart-sentinel.js";
 import { scheduleGatewaySigusr1Restart } from "../../infra/restart.js";
+import { isWSLSync } from "../../infra/wsl.js";
 import { loadOpenClawPlugins } from "../../plugins/loader.js";
 import { diffConfigPaths } from "../config-reload.js";
 import {
@@ -539,7 +540,16 @@ export const configHandlers: GatewayRequestHandlers = {
     }
     const configPath = createConfigIO().configPath;
     const platform = process.platform;
-    const cmd = platform === "darwin" ? "open" : platform === "win32" ? "start" : "xdg-open";
+    let cmd: string;
+    if (platform === "darwin") {
+      cmd = "open";
+    } else if (platform === "win32") {
+      cmd = "start";
+    } else if (isWSLSync()) {
+      cmd = "wslview";
+    } else {
+      cmd = "xdg-open";
+    }
     exec(`${cmd} ${JSON.stringify(configPath)}`, (err) => {
       if (err) {
         respond(true, { ok: false, path: configPath, error: err.message }, undefined);
