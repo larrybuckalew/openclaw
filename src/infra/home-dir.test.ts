@@ -25,14 +25,6 @@ describe("resolveEffectiveHomeDir", () => {
       expected: "/home/alice",
     },
     {
-      name: "falls back to USERPROFILE when HOME is blank",
-      env: {
-        HOME: "   ",
-        USERPROFILE: " C:/Users/alice ",
-      } as NodeJS.ProcessEnv,
-      expected: "C:/Users/alice",
-    },
-    {
       name: "falls back to homedir when env values are blank",
       env: {
         OPENCLAW_HOME: " ",
@@ -55,18 +47,35 @@ describe("resolveEffectiveHomeDir", () => {
       } as NodeJS.ProcessEnv,
       expected: "/home/alice/svc",
     },
-    {
-      name: "expands ~\\\\ using USERPROFILE",
-      env: {
-        OPENCLAW_HOME: "~\\svc",
-        HOME: " ",
-        USERPROFILE: "C:/Users/alice",
-      } as NodeJS.ProcessEnv,
-      expected: "C:/Users/alice\\svc",
-    },
   ])("$name", ({ env, expected }) => {
     expect(resolveEffectiveHomeDir(env)).toBe(path.resolve(expected));
   });
+
+  it.runIf(process.platform === "win32")("expands ~\\\\ using USERPROFILE on win32", () => {
+    const env = {
+      OPENCLAW_HOME: "~\\svc",
+      HOME: " ",
+      USERPROFILE: "C:/Users/alice",
+    } as NodeJS.ProcessEnv;
+    expect(resolveEffectiveHomeDir(env)).toBe(path.resolve("C:/Users/alice\\svc"));
+  });
+
+  it.runIf(process.platform === "win32")(
+    "falls back to USERPROFILE when HOME is blank on win32",
+    () => {
+      const env = { HOME: "   ", USERPROFILE: " C:/Users/alice " } as NodeJS.ProcessEnv;
+      expect(resolveEffectiveHomeDir(env)).toBe(path.resolve("C:/Users/alice"));
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "ignores USERPROFILE on Linux/WSL and falls back to os.homedir()",
+    () => {
+      const env = { HOME: "   ", USERPROFILE: "/mnt/c/Users/alice" } as NodeJS.ProcessEnv;
+      // On Linux/WSL, USERPROFILE is the Windows profile path — skip it, use homedir() instead.
+      expect(resolveEffectiveHomeDir(env, () => "/home/alice")).toBe(path.resolve("/home/alice"));
+    },
+  );
 });
 
 describe("resolveRequiredHomeDir", () => {

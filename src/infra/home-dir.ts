@@ -19,7 +19,9 @@ function resolveRawHomeDir(env: NodeJS.ProcessEnv, homedir: () => string): strin
   if (explicitHome) {
     if (explicitHome === "~" || explicitHome.startsWith("~/") || explicitHome.startsWith("~\\")) {
       const fallbackHome =
-        normalize(env.HOME) ?? normalize(env.USERPROFILE) ?? normalizeSafe(homedir);
+        normalize(env.HOME) ??
+        (process.platform === "win32" ? normalize(env.USERPROFILE) : undefined) ??
+        normalizeSafe(homedir);
       if (fallbackHome) {
         return explicitHome.replace(/^~(?=$|[\\/])/, fallbackHome);
       }
@@ -33,9 +35,12 @@ function resolveRawHomeDir(env: NodeJS.ProcessEnv, homedir: () => string): strin
     return envHome;
   }
 
-  const userProfile = normalize(env.USERPROFILE);
-  if (userProfile) {
-    return userProfile;
+  // Only use USERPROFILE on win32 — on Linux/WSL it is the Windows profile path, not the Linux home.
+  if (process.platform === "win32") {
+    const userProfile = normalize(env.USERPROFILE);
+    if (userProfile) {
+      return userProfile;
+    }
   }
 
   return normalizeSafe(homedir);
